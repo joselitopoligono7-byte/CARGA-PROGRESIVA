@@ -191,9 +191,10 @@
     return { exercises: [] };
   }
 
-  // --- Logica de sugerencia: doble progresion ---
-  // Regla explicita, sin caja negra:
-  // 1. Si en la ultima sesion llegaste al MAXIMO del rango en todas las series -> sube el peso.
+  // --- Logica de sugerencia: doble progresion + deteccion de estancamiento ---
+  // Reglas explicitas, sin caja negra:
+  // 0. Si llevas 3+ sesiones seguidas con el MISMO peso sin llegar al maximo -> estancamiento, sugiere deload.
+  // 1. Si en la ultima sesion llegaste al MAXIMO del rango -> sube el peso.
   // 2. Si te quedaste POR DEBAJO del minimo -> repite el mismo peso.
   // 3. Si estas DENTRO del rango -> mismo peso, intenta una repeticion mas.
   function computeSuggestion(ex) {
@@ -201,6 +202,22 @@
     const sorted = [...ex.entries].sort((a, b) => a.date.localeCompare(b.date));
     const last = sorted[sorted.length - 1];
     const min = ex.repMin, max = ex.repMax;
+
+    // Racha de sesiones consecutivas (desde la ultima hacia atras) con el mismo peso
+    const streak = [];
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].weight === last.weight) streak.push(sorted[i]);
+      else break;
+    }
+    const isStalled = streak.length >= 3 && streak.every((e) => e.reps < max);
+
+    if (isStalled) {
+      const deload = Math.round((last.weight * 0.9) / 0.25) * 0.25;
+      return {
+        weight: deload,
+        reason: `Llevas ${streak.length} sesiones seguidas con ${last.weight}kg sin llegar a ${max} reps. Parece un estancamiento: baja el peso ~10% (deload) para romper la meseta y volver a progresar.`,
+      };
+    }
     if (last.reps >= max) {
       return {
         weight: Math.round((last.weight + ex.increment) * 100) / 100,
