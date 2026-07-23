@@ -1,4 +1,4 @@
-const CACHE_NAME = "carga-progresiva-v1";
+const CACHE_NAME = "carga-progresiva-v2";
 const ASSETS = [
   "./",
   "./index.html",

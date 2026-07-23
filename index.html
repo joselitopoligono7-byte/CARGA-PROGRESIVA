@@ -115,6 +115,19 @@
   .pr { background: rgba(201,106,59,0.15); color: var(--iron-light); font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 700; }
   .icon-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 4px; }
   .error { color: var(--iron-light); font-size: 13px; margin-top: 8px; }
+  .suggestion {
+    border: 1px solid var(--iron);
+    background: rgba(201,106,59,0.08);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .suggestion .sugg-weight { font-size: 26px; font-weight: 800; color: var(--iron-light); }
+  .suggestion .sugg-reason { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .suggestion button { margin-top: 10px; }
+  .goal-row { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; }
+  .goal-row .field { flex: 1; margin-bottom: 0; }
+  .goal-row label { font-size: 10px; }
   svg.chart { width: 100%; height: 160px; display: block; }
   .install-banner {
     display: none;
@@ -164,9 +177,46 @@
   function loadData() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Compatibilidad: ejercicios guardados antes de la funcion de sugerencias
+        parsed.exercises.forEach((ex) => {
+          if (ex.repMin === undefined) ex.repMin = 8;
+          if (ex.repMax === undefined) ex.repMax = 12;
+          if (ex.increment === undefined) ex.increment = 2.5;
+        });
+        return parsed;
+      }
     } catch (e) {}
     return { exercises: [] };
+  }
+
+  // --- Logica de sugerencia: doble progresion ---
+  // Regla explicita, sin caja negra:
+  // 1. Si en la ultima sesion llegaste al MAXIMO del rango en todas las series -> sube el peso.
+  // 2. Si te quedaste POR DEBAJO del minimo -> repite el mismo peso.
+  // 3. Si estas DENTRO del rango -> mismo peso, intenta una repeticion mas.
+  function computeSuggestion(ex) {
+    if (!ex.entries.length) return null;
+    const sorted = [...ex.entries].sort((a, b) => a.date.localeCompare(b.date));
+    const last = sorted[sorted.length - 1];
+    const min = ex.repMin, max = ex.repMax;
+    if (last.reps >= max) {
+      return {
+        weight: Math.round((last.weight + ex.increment) * 100) / 100,
+        reason: `Llegaste a ${last.reps} reps (tu maximo es ${max}) el ${last.date}. Toca subir el peso.`,
+      };
+    }
+    if (last.reps < min) {
+      return {
+        weight: last.weight,
+        reason: `Te quedaste en ${last.reps} reps (tu minimo es ${min}) el ${last.date}. Repite el mismo peso y cuida la tecnica.`,
+      };
+    }
+    return {
+      weight: last.weight,
+      reason: `Estas dentro de tu rango (${min}-${max} reps). Manten el peso e intenta sumar una repeticion mas.`,
+    };
   }
   function saveData(data) {
     try {
@@ -272,7 +322,26 @@
     const platesLeft = [...plates].reverse().map((p) => plateDiv(p)).join("");
     const platesRight = [...plates].map((p) => plateDiv(p)).join("");
 
+    const suggestion = computeSuggestion(ex);
+
     content.innerHTML = `
+      ${suggestion ? `
+      <div class="suggestion">
+        <div class="card-title" style="color:var(--iron-light);">Sugerencia para tu proxima sesion</div>
+        <div class="sugg-weight">${suggestion.weight} kg</div>
+        <div class="sugg-reason">${suggestion.reason}</div>
+        <button class="primary" id="useSuggestionBtn">Usar este peso</button>
+      </div>` : ""}
+
+      <div class="card">
+        <div class="card-title">Objetivo de repeticiones</div>
+        <div class="goal-row">
+          <div class="field"><label>Min reps</label><input type="number" id="fRepMin" class="input" value="${ex.repMin}" /></div>
+          <div class="field"><label>Max reps</label><input type="number" id="fRepMax" class="input" value="${ex.repMax}" /></div>
+          <div class="field"><label>Incremento (kg)</label><input type="number" step="0.5" id="fIncrement" class="input" value="${ex.increment}" /></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">Barra cargada</div>
         <div class="bar-wrap">${platesLeft}<div class="bar"></div>${platesRight}</div>
@@ -303,6 +372,23 @@
     `;
 
     document.getElementById("addEntryBtn").onclick = () => addEntry(ex.id);
+
+    if (suggestion) {
+      document.getElementById("useSuggestionBtn").onclick = () => {
+        document.getElementById("fWeight").value = suggestion.weight;
+        document.getElementById("fWeight").focus();
+      };
+    }
+
+    ["fRepMin", "fRepMax", "fIncrement"].forEach((id) => {
+      document.getElementById(id).addEventListener("change", () => {
+        ex.repMin = parseInt(document.getElementById("fRepMin").value, 10) || 1;
+        ex.repMax = parseInt(document.getElementById("fRepMax").value, 10) || ex.repMin;
+        ex.increment = parseFloat(document.getElementById("fIncrement").value) || 2.5;
+        saveData(data);
+        renderContent();
+      });
+    });
   }
 
   function plateDiv(p) {
@@ -364,7 +450,7 @@
     const input = document.getElementById("newExerciseInput");
     const name = input.value.trim();
     if (!name) return;
-    const newEx = { id: uid(), name, entries: [] };
+    const newEx = { id: uid(), name, entries: [], repMin: 8, repMax: 12, increment: 2.5 };
     data.exercises.push(newEx);
     activeId = newEx.id;
     saveData(data);
