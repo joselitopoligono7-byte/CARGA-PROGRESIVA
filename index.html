@@ -171,7 +171,7 @@
 <div class="card" style="margin-top: 20px; padding: 15px; border-radius: 12px; background: rgba(255,255,255,0.05); margin-bottom: 20px;">
   <h3 style="margin-top: 0; font-size: 1.1em; color: #fff;">💾 Copias de Seguridad y Datos</h3>
   <p style="font-size: 0.85em; color: #aaa; margin-bottom: 12px;">
-    Guarda tus datos a salvo o pásalos a otro móvil sin perder nada.
+    Guarda tus datos a salvo o exporta tus informes en PDF y Excel.
   </p>
   
   <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -183,13 +183,18 @@
       📤 Cargar Copia
       <input type="file" id="importInput" accept=".json" onchange="importarCopiaJSON(event)" style="display: none;" />
     </label>
+
+    <button type="button" onclick="exportarPDF()" style="width: 100%; padding: 10px; background: #ef4444; color: white; border: none; border-radius: 8px; font-size: 0.9em; font-weight: bold; cursor: pointer; margin-top: 5px;">
+      📄 Generar Informe en PDF
+    </button>
     
-    <button type="button" onclick="exportarCSV()" style="width: 100%; padding: 10px; background: #4b5563; color: white; border: none; border-radius: 8px; font-size: 0.9em; cursor: pointer; margin-top: 5px;">
+    <button type="button" onclick="exportarCSV()" style="width: 100%; padding: 10px; background: #4b5563; color: white; border: none; border-radius: 8px; font-size: 0.9em; cursor: pointer; margin-top: 2px;">
       📊 Exportar a Excel (CSV)
     </button>
   </div>
 </div>
-  <script>  
+
+<script>  
 (function () {
   const PLATE_SET = [25, 20, 15, 10, 5, 2.5, 1.25];
   const BAR_WEIGHT = 20;
@@ -204,7 +209,6 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        // Compatibilidad: ejercicios guardados antes de la funcion de sugerencias
         parsed.exercises.forEach((ex) => {
           if (ex.repMin === undefined) ex.repMin = 8;
           if (ex.repMax === undefined) ex.repMax = 12;
@@ -216,19 +220,12 @@
     return { exercises: [] };
   }
 
-  // --- Logica de sugerencia: doble progresion + deteccion de estancamiento ---
-  // Reglas explicitas, sin caja negra:
-  // 0. Si llevas 3+ sesiones seguidas con el MISMO peso sin llegar al maximo -> estancamiento, sugiere deload.
-  // 1. Si en la ultima sesion llegaste al MAXIMO del rango -> sube el peso.
-  // 2. Si te quedaste POR DEBAJO del minimo -> repite el mismo peso.
-  // 3. Si estas DENTRO del rango -> mismo peso, intenta una repeticion mas.
   function computeSuggestion(ex) {
     if (!ex.entries.length) return null;
     const sorted = [...ex.entries].sort((a, b) => a.date.localeCompare(b.date));
     const last = sorted[sorted.length - 1];
     const min = ex.repMin, max = ex.repMax;
 
-    // Racha de sesiones consecutivas (desde la ultima hacia atras) con el mismo peso
     const streak = [];
     for (let i = sorted.length - 1; i >= 0; i--) {
       if (sorted[i].weight === last.weight) streak.push(sorted[i]);
@@ -246,20 +243,21 @@
     if (last.reps >= max) {
       return {
         weight: Math.round((last.weight + ex.increment) * 100) / 100,
-        reason: `Llegaste a ${last.reps} reps (tu maximo es ${max}) el ${last.date}. Toca subir el peso.`,
+        reason: `Llegaste a ${last.reps} reps (tu máximo es ${max}) el ${last.date}. Toca subir el peso.`,
       };
     }
     if (last.reps < min) {
       return {
         weight: last.weight,
-        reason: `Te quedaste en ${last.reps} reps (tu minimo es ${min}) el ${last.date}. Repite el mismo peso y cuida la tecnica.`,
+        reason: `Te quedaste en ${last.reps} reps (tu mínimo es ${min}) el ${last.date}. Repite el mismo peso y cuida la técnica.`,
       };
     }
     return {
       weight: last.weight,
-      reason: `Estas dentro de tu rango (${min}-${max} reps). Manten el peso e intenta sumar una repeticion mas.`,
+      reason: `Estás dentro de tu rango (${min}-${max} reps). Mantén el peso e intenta sumar una repetición más.`,
     };
   }
+
   function saveData(data) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -369,7 +367,7 @@
     content.innerHTML = `
       ${suggestion ? `
       <div class="suggestion">
-        <div class="card-title" style="color:var(--iron-light);">Sugerencia para tu proxima sesion</div>
+        <div class="card-title" style="color:var(--iron-light);">Sugerencia para tu próxima sesión</div>
         <div class="sugg-weight">${suggestion.weight} kg</div>
         <div class="sugg-reason">${suggestion.reason}</div>
         <button class="primary" id="useSuggestionBtn">Usar este peso</button>
@@ -477,7 +475,6 @@
   function renderAll() {
     renderTabs();
     renderContent();
-    // wire up delete-entry buttons
     document.querySelectorAll(".icon-btn[data-id]").forEach((btn) => {
       btn.onclick = () => {
         const ex = data.exercises.find((e) => e.id === activeId);
@@ -520,67 +517,132 @@
     document.getElementById("installBanner").style.display = "none";
   };
 
-  // Register service worker for offline support
+  // Register service worker
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("sw.js").catch(() => {});
     });
   }
-function exportarCopiaJSON() {
-  const datos = localStorage.getItem('cp-gym-data-v1') || '{}';
-  const blob = new Blob([datos], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const fecha = new Date().toISOString().slice(0, 10);
-  a.href = url;
-  a.download = `carga_progresiva_backup_${fecha}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
-function importarCopiaJSON(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const contenido = JSON.parse(e.target.result);
-      if (confirm("⚠️ ¿Quieres reemplazar tus datos actuales con los de esta copia de seguridad?")) {
-        localStorage.setItem('cp-gym-data-v1', JSON.stringify(contenido));
-        alert("✅ ¡Copia de seguridad restaurada con éxito!");
-        location.reload();
-      }
-    } catch (err) {
-      alert("❌ El archivo seleccionado no es válido o está dañado.");
-    }
+  // FUNCIONES GLOBALES DE EXPORTACIÓN Y RESPALDO (CORREGIDAS)
+  window.exportarCopiaJSON = function() {
+    const datos = localStorage.getItem('cp-gym-data-v1') || '{"exercises":[]}';
+    const blob = new Blob([datos], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fecha = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `carga_progresiva_backup_${fecha}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
-  reader.readAsText(file);
-}
 
-function exportarCSV() {
-  const datosRaw = localStorage.getItem('cp-gym-data-v1');
-  if (!datosRaw) {
-    alert("No hay entrenamientos guardados para exportar.");
-    return;
-  }
-  const datos = JSON.parse(datosRaw);
-  let csvContent = "data:text/csv;charset=utf-8,Fecha,Ejercicio,Peso(kg),Repeticiones,Series\n";
-  Object.keys(datos).forEach(ejercicio => {
-    if (Array.isArray(datos[ejercicio])) {
-      datos[ejercicio].forEach(sesion => {
-        csvContent += `"${sesion.fecha || ''}","${ejercicio}",${sesion.peso || 0},${sesion.reps || 0},${sesion.series || 0}\n`;
-      });
+  window.importarCopiaJSON = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const contenido = JSON.parse(e.target.result);
+        if (confirm("⚠️ ¿Quieres reemplazar tus datos actuales con los de esta copia de seguridad?")) {
+          localStorage.setItem('cp-gym-data-v1', JSON.stringify(contenido));
+          alert("✅ ¡Copia de seguridad restaurada con éxito!");
+          location.reload();
+        }
+      } catch (err) {
+        alert("❌ El archivo seleccionado no es válido o está dañado.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  window.exportarCSV = function() {
+    const datosRaw = localStorage.getItem('cp-gym-data-v1');
+    if (!datosRaw) {
+      alert("No hay entrenamientos guardados para exportar.");
+      return;
     }
-  });
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  const fecha = new Date().toISOString().slice(0, 10);
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `mis_entrenamientos_${fecha}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+    const parsed = JSON.parse(datosRaw);
+    if (!parsed.exercises || parsed.exercises.length === 0) {
+      alert("No hay ejercicios para exportar.");
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,Ejercicio,Fecha,Peso(kg),Repeticiones,Series\n";
+    parsed.exercises.forEach(ex => {
+      if (Array.isArray(ex.entries)) {
+        ex.entries.forEach(entry => {
+          csvContent += `"${ex.name}","${entry.date || ''}",${entry.weight || 0},${entry.reps || 0},${entry.sets || 0}\n`;
+        });
+      }
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    const fecha = new Date().toISOString().slice(0, 10);
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `mis_entrenamientos_${fecha}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  window.exportarPDF = function() {
+    const datosRaw = localStorage.getItem('cp-gym-data-v1');
+    if (!datosRaw) {
+      alert("No hay datos para generar el informe PDF.");
+      return;
+    }
+    const parsed = JSON.parse(datosRaw);
+    if (!parsed.exercises || parsed.exercises.length === 0) {
+      alert("No hay ejercicios guardados para generar el PDF.");
+      return;
+    }
+
+    const fechaHoy = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    let html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Informe - Carga Progresiva</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; color: #111; background: #fff; }
+          h1 { color: #4C6B85; border-bottom: 2px solid #C96A3B; padding-bottom: 6px; font-size: 22px; margin-bottom: 4px; }
+          .fecha { font-size: 12px; color: #666; margin-bottom: 20px; }
+          .block { margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; padding: 12px; page-break-inside: avoid; }
+          .title { font-size: 15px; font-weight: bold; color: #C96A3B; margin-bottom: 8px; text-transform: uppercase; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: center; }
+          th { background: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <h1>🏋️‍♂️ Informe de Carga Progresiva</h1>
+        <div class="fecha">Generado el: ${fechaHoy}</div>
+    `;
+
+    parsed.exercises.forEach(ex => {
+      html += `<div class="block"><div class="title">💪 ${ex.name}</div>`;
+      if (!ex.entries || ex.entries.length === 0) {
+        html += `<p style="font-size:12px; color:#888;">Sin registros guardados.</p>`;
+      } else {
+        html += `<table><thead><tr><th>Fecha</th><th>Peso (kg)</th><th>Reps</th><th>Series</th></tr></thead><tbody>`;
+        ex.entries.forEach(en => {
+          html += `<tr><td>${en.date}</td><td><strong>${en.weight} kg</strong></td><td>${en.reps}</td><td>${en.sets}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+      html += `</div>`;
+    });
+
+    html += `</body></html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 400);
+  };
 })();  
 </script>
 </body>
