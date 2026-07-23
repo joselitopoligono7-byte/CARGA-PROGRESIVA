@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1B1C1E" />
+<title>Carga Progresiva</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<style>
+  :root {
+    --bg: #1B1C1E;
+    --surface: #26282B;
+    --border: #333537;
+    --steel: #4C6B85;
+    --iron: #C96A3B;
+    --iron-light: #E08A5E;
+    --chalk: #EDEAE2;
+    --muted: #8B8D8E;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--chalk);
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body { padding: 20px 16px 48px; padding-top: calc(20px + env(safe-area-inset-top)); }
+  h1 {
+    font-size: 24px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .tabs { display: flex; gap: 8px; overflow-x: auto; margin: 20px 0 10px; padding-bottom: 2px; }
+  .tab {
+    flex: 0 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .tab.active { background: var(--steel); border-color: var(--steel); color: #fff; }
+  .tab button.del {
+    background: none; border: none; color: inherit; opacity: 0.5; padding: 0; cursor: pointer; font-size: 14px; line-height: 1;
+  }
+  .add-row { display: flex; gap: 6px; margin-bottom: 18px; }
+  input, .input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--chalk);
+    padding: 10px 12px;
+    font-size: 14px;
+    width: 100%;
+    font-family: inherit;
+  }
+  input:focus { outline: 2px solid var(--steel); outline-offset: 1px; }
+  button.primary {
+    background: var(--iron);
+    border: none;
+    color: #1B1C1E;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 16px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .bar-wrap {
+    display: flex; align-items: center; justify-content: center; gap: 2px;
+    padding: 14px 0 6px; flex-wrap: nowrap; overflow-x: auto;
+  }
+  .plate { border-radius: 3px; border: 1px solid rgba(0,0,0,0.3); flex: 0 0 auto; }
+  .bar { width: 60px; height: 7px; background: #5C5E60; border-radius: 2px; flex: 0 0 auto; }
+  .readout { text-align: center; font-size: 30px; font-weight: 800; margin-top: 6px; }
+  .readout span { font-size: 13px; color: var(--muted); font-weight: 400; display: block; margin-top: 2px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  label { font-size: 11px; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
+  .field { margin-bottom: 4px; }
+  .empty { color: var(--muted); text-align: center; padding: 30px 10px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 10px; text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 4px; border-bottom: 1px solid #2C2E30; }
+  .pr { background: rgba(201,106,59,0.15); color: var(--iron-light); font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+  .icon-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 4px; }
+  .error { color: var(--iron-light); font-size: 13px; margin-top: 8px; }
+  svg.chart { width: 100%; height: 160px; display: block; }
+  .install-banner {
+    display: none;
+    background: var(--steel);
+    color: #fff;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .install-banner button {
+    background: #fff; color: var(--steel); border: none; border-radius: 6px; padding: 6px 12px; font-weight: 700; font-size: 12px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h1>🏋 Carga Progresiva</h1>
+<div class="sub">Registro de cargas para tu entrenamiento</div>
+
+<div class="install-banner" id="installBanner">
+  <span>Instala la app en tu pantalla de inicio</span>
+  <button id="installBtn">Instalar</button>
+</div>
+
+<div class="tabs" id="tabs"></div>
+<div class="add-row">
+  <input id="newExerciseInput" class="input" placeholder="Nuevo ejercicio" />
+  <button class="primary" id="addExerciseBtn">+</button>
+</div>
+
+<div id="content"></div>
+
+<script>
+(function () {
+  const PLATE_SET = [25, 20, 15, 10, 5, 2.5, 1.25];
+  const BAR_WEIGHT = 20;
+  const PLATE_COLORS = { 25: "#C96A3B", 20: "#4C6B85", 15: "#7A8F5C", 10: "#C9A23B", 5: "#8B8D8E", 2.5: "#5C5E60", 1.25: "#3D3F41" };
+  const STORAGE_KEY = "cp-gym-data-v1";
+
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+  function loadData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return { exercises: [] };
+  }
+  function saveData(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      showError("No se pudo guardar. Comprueba el espacio de almacenamiento.");
+    }
+  }
+
+  let data = loadData();
+  let activeId = data.exercises[0]?.id ?? null;
+
+  function calcPlates(totalWeight) {
+    let perSide = Math.max(0, (totalWeight - BAR_WEIGHT) / 2);
+    const plates = [];
+    for (const p of PLATE_SET) {
+      while (perSide >= p - 0.001) {
+        plates.push(p);
+        perSide -= p;
+      }
+    }
+    return plates;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById("formError");
+    if (el) el.textContent = msg;
+  }
+
+  function renderTabs() {
+    const tabsEl = document.getElementById("tabs");
+    tabsEl.innerHTML = "";
+    data.exercises.forEach((ex) => {
+      const tab = document.createElement("div");
+      tab.className = "tab" + (ex.id === activeId ? " active" : "");
+      tab.innerHTML = `<span>${escapeHtml(ex.name)}</span>`;
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "✕";
+      del.onclick = (e) => {
+        e.stopPropagation();
+        if (confirm(`¿Eliminar "${ex.name}" y todo su historial?`)) {
+          data.exercises = data.exercises.filter((e2) => e2.id !== ex.id);
+          if (activeId === ex.id) activeId = data.exercises[0]?.id ?? null;
+          saveData(data);
+          renderAll();
+        }
+      };
+      tab.appendChild(del);
+      tab.onclick = () => { activeId = ex.id; renderAll(); };
+      tabsEl.appendChild(tab);
+    });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderChart(entries) {
+    if (entries.length < 2) return `<div class="empty">Añade al menos dos registros para ver la progresión.</div>`;
+    const w = 320, h = 150, pad = 28;
+    const weights = entries.map((e) => e.weight);
+    const min = Math.min(...weights), max = Math.max(...weights);
+    const range = max - min || 1;
+    const stepX = (w - pad * 2) / (entries.length - 1);
+    const points = entries.map((e, i) => {
+      const x = pad + i * stepX;
+      const y = h - pad - ((e.weight - min) / range) * (h - pad * 2);
+      return [x, y];
+    });
+    const path = points.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(" ");
+    const dots = points.map((p) => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#C96A3B" />`).join("");
+    const gridLines = [0, 0.5, 1].map((f) => {
+      const y = pad + f * (h - pad * 2);
+      return `<line x1="${pad}" y1="${y}" x2="${w - pad}" y2="${y}" stroke="#333537" stroke-dasharray="3,3" />`;
+    }).join("");
+    const firstDate = entries[0].date, lastDate = entries[entries.length - 1].date;
+    return `
+      <svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        ${gridLines}
+        <path d="${path}" fill="none" stroke="#C96A3B" stroke-width="2" />
+        ${dots}
+        <text x="${pad}" y="${h - 6}" font-size="9" fill="#8B8D8E">${firstDate}</text>
+        <text x="${w - pad}" y="${h - 6}" font-size="9" fill="#8B8D8E" text-anchor="end">${lastDate}</text>
+        <text x="${pad}" y="14" font-size="9" fill="#8B8D8E">${max} kg</text>
+        <text x="${pad}" y="${h - pad + 4}" font-size="9" fill="#8B8D8E">${min} kg</text>
+      </svg>
+    `;
+  }
+
+  function renderContent() {
+    const content = document.getElementById("content");
+    const ex = data.exercises.find((e) => e.id === activeId);
+    if (!ex) {
+      content.innerHTML = `<div class="card"><div class="empty">Añade un ejercicio arriba para empezar a registrar tus cargas.</div></div>`;
+      return;
+    }
+    const sortedEntries = [...ex.entries].sort((a, b) => a.date.localeCompare(b.date));
+    const lastWeight = sortedEntries.length ? sortedEntries[sortedEntries.length - 1].weight : 0;
+    const plates = calcPlates(lastWeight);
+    const best = sortedEntries.reduce((a, b) => (!a || b.weight > a.weight ? b : a), null);
+
+    const platesLeft = [...plates].reverse().map((p) => plateDiv(p)).join("");
+    const platesRight = [...plates].map((p) => plateDiv(p)).join("");
+
+    content.innerHTML = `
+      <div class="card">
+        <div class="card-title">Barra cargada</div>
+        <div class="bar-wrap">${platesLeft}<div class="bar"></div>${platesRight}</div>
+        <div class="readout">${lastWeight || 0} kg<span>barra de ${BAR_WEIGHT}kg incluida</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Progresión</div>
+        ${renderChart(sortedEntries)}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Nuevo registro</div>
+        <div class="form-grid">
+          <div class="field"><label>Fecha</label><input type="date" id="fDate" class="input" value="${todayStr()}" /></div>
+          <div class="field"><label>Peso (kg)</label><input type="number" id="fWeight" class="input" placeholder="60" /></div>
+          <div class="field"><label>Reps</label><input type="number" id="fReps" class="input" placeholder="8" /></div>
+          <div class="field"><label>Series</label><input type="number" id="fSets" class="input" placeholder="3" /></div>
+        </div>
+        <div style="margin-top:12px;"><button class="primary" id="addEntryBtn">+ Añadir registro</button></div>
+        <div class="error" id="formError"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Historial</div>
+        ${sortedEntries.length === 0 ? `<div class="empty">Todavía no hay registros para este ejercicio.</div>` : renderTable(sortedEntries, best)}
+      </div>
+    `;
+
+    document.getElementById("addEntryBtn").onclick = () => addEntry(ex.id);
+  }
+
+  function plateDiv(p) {
+    const wSize = p >= 15 ? 32 : p >= 5 ? 24 : 16;
+    const hSize = p >= 15 ? 62 : p >= 5 ? 46 : 32;
+    const color = PLATE_COLORS[p] || "#5C5E60";
+    return `<div class="plate" style="width:${wSize}px;height:${hSize}px;background:${color};"></div>`;
+  }
+
+  function renderTable(entries, best) {
+    const rows = [...entries].reverse().map((e) => `
+      <tr>
+        <td>${e.date}</td>
+        <td>${e.weight} kg</td>
+        <td>${e.reps}</td>
+        <td>${e.sets}</td>
+        <td>${best && best.id === e.id ? '<span class="pr">PR</span>' : ""}</td>
+        <td style="text-align:right;"><button class="icon-btn" data-id="${e.id}">✕</button></td>
+      </tr>
+    `).join("");
+    return `
+      <table>
+        <thead><tr><th>Fecha</th><th>Peso</th><th>Reps</th><th>Series</th><th></th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  function addEntry(exId) {
+    const weight = parseFloat(document.getElementById("fWeight").value);
+    const reps = parseInt(document.getElementById("fReps").value, 10);
+    const sets = parseInt(document.getElementById("fSets").value, 10) || 1;
+    const date = document.getElementById("fDate").value || todayStr();
+    if (!weight || !reps) {
+      showError("Introduce peso y repeticiones válidos.");
+      return;
+    }
+    const exercise = data.exercises.find((e) => e.id === exId);
+    exercise.entries.push({ id: uid(), date, weight, reps, sets });
+    saveData(data);
+    renderAll();
+  }
+
+  function renderAll() {
+    renderTabs();
+    renderContent();
+    // wire up delete-entry buttons
+    document.querySelectorAll(".icon-btn[data-id]").forEach((btn) => {
+      btn.onclick = () => {
+        const ex = data.exercises.find((e) => e.id === activeId);
+        ex.entries = ex.entries.filter((en) => en.id !== btn.dataset.id);
+        saveData(data);
+        renderAll();
+      };
+    });
+  }
+
+  document.getElementById("addExerciseBtn").onclick = () => {
+    const input = document.getElementById("newExerciseInput");
+    const name = input.value.trim();
+    if (!name) return;
+    const newEx = { id: uid(), name, entries: [] };
+    data.exercises.push(newEx);
+    activeId = newEx.id;
+    saveData(data);
+    input.value = "";
+    renderAll();
+  };
+  document.getElementById("newExerciseInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("addExerciseBtn").click();
+  });
+
+  renderAll();
+
+  // Install prompt handling
+  let deferredPrompt;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById("installBanner").style.display = "flex";
+  });
+  document.getElementById("installBtn").onclick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    document.getElementById("installBanner").style.display = "none";
+  };
+
+  // Register service worker for offline support
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
